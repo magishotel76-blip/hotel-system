@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      String   @default("ADMIN")
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id           String        @id @default(uuid())
+  clientType   String        @default("NATURAL") // NATURAL, EMPRESA
+  name         String
+  document     String        @unique // RUC/Cedula
+  phone        String?
+  email        String?
+  address      String?
+  notes        String?
+  proforma     String?       @db.Text // Store JSON or Text for proforma prices
+  customRoomPrice      Float?
+  customBreakfastPrice Float?
+  customLunchPrice     Float?
+  customSnackPrice     Float?
+  customDinnerPrice    Float?
+  companyIndividualPrice Float?
+  companySharedPrice     Float?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  companyId    String?
+  company      Customer?     @relation("CompanyEmployees", fields: [companyId], references: [id])
+  employees    Customer[]    @relation("CompanyEmployees")
+
+  reservations Reservation[]
+  inventoryTransactions InventoryTransaction[]
+}
+
+model RoomType {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rooms       Room[]
+}
+
+model Room {
+  id            String        @id @default(uuid())
+  roomNumber    String        @unique
+  roomTypeId    String
+  roomType      RoomType      @relation(fields: [roomTypeId], references: [id])
+  pricePerNight Float
+  status        String        @default("disponible") // disponible, ocupada, limpieza, mantenimiento
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  images        RoomImage[]
+  reservations  Reservation[]
+  webReservations WebReservation[]
+  inventoryTransactions InventoryTransaction[]
+}
+
+model RoomImage {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  imageUrl  String
+  createdAt DateTime @default(now())
+}
+
+model WebReservation {
+  id                String   @id @default(uuid())
+  roomId            String
+  room              Room     @relation(fields: [roomId], references: [id])
+  responsibleName   String
+  guestCount        Int
+  company           String?
+  phone             String
+  email             String?
+  checkIn           DateTime
+  checkOut          DateTime
+  notes             String?  @db.Text
+  status            String   @default("pendiente") // pendiente, confirmada, rechazada
+  createdAt         DateTime @default(now())
+}
+
+model Reservation {
+  id           String    @id @default(uuid())
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  roomId       String
+  room         Room      @relation(fields: [roomId], references: [id])
+  checkInDate  DateTime
+  checkOutDate DateTime
+  totalPrice   Float
+  guestsCount  Int       @default(1)
+  guestNames   String?   @db.Text
+  status       String    @default("activa") // activa, completada, cancelada
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  invoices     Invoice[]
+  inventoryTransactions InventoryTransaction[]
+}
+
+model Product {
+  id                 String                 @id @default(uuid())
+  barcode            String?                @unique
+  name               String
+  weight             String?
+  expirationDate     DateTime?
+  category           String?
+  supplier           String?
+  purchasePrice      Float
+  salePrice          Float
+  stock              Int                    @default(0)
+  minStock           Int                    @default(5)
+  unit               String                 @default("unidad") // unidad, kilo, libra, quintal, paquete, etc.
+  isSellable         Boolean                @default(true)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  transactions       InventoryTransaction[]
+  invoiceItems       InvoiceItem[]
+}
+
+model InventoryTransaction {
+  id            String   @id @default(uuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  type          String   // entrada, salida
+  exitType      String?  // venta, uso_interno, cambio
+  roomId        String?
+  room          Room?    @relation(fields: [roomId], references: [id])
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  reservationId String?
+  reservation   Reservation? @relation(fields: [reservationId], references: [id])
+  quantity      Int
+  price         Float?    // Actual sale price at the time of transaction
+  notes         String?
+  paymentMethod String   @default("cash") // cash, transfer, office
+  transferReference String?
+  status        String   @default("pending") // pending, settled
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  category    String
+  description String
+  amount      Float
+  paymentMethod String   @default("cash") // cash, transfer, office
+  transferReference String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceType   String        @default("NORMAL") // NORMAL, SEPARADA, COMBINADA
+  reservationId String?
+  reservation   Reservation?  @relation(fields: [reservationId], references: [id])
+  companyId     String?       // In case of corporate billing spanning multiple reservations
+  totalAmount   Float
+  status        String        @default("borrador") // borrador, pagada
+  paymentMethod String        @default("cash") // cash, transfer, office
+  transferReference String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  type        String   // habitacion, producto, servicio
+  description String
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
