@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Edit2, Trash2, Building, User, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building, User, FileText, MessageCircle } from 'lucide-react';
 
 // Reusable Drawer Component
 const Drawer = ({ isOpen, onClose, title, children, widthClass = "max-w-md" }) => {
@@ -183,7 +183,20 @@ export default function Customers() {
                   <td className="px-6 py-4 font-mono text-slate-600">{c.document}</td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-slate-800">{c.email || '-'}</div>
-                    <div className="text-sm text-slate-500">{c.phone || '-'}</div>
+                    <div className="text-sm text-slate-500 flex items-center">
+                      {c.phone || '-'}
+                      {c.phone && (
+                        <a 
+                          href={`https://wa.me/${c.phone.replace(/\D/g, '')}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="ml-2 text-emerald-500 hover:text-emerald-600 transition"
+                          title="Contactar por WhatsApp"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <button onClick={() => handleEdit(c)} className="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition" title="Editar">

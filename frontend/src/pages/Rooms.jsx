@@ -254,7 +254,7 @@ export default function Rooms() {
                <div className="grid grid-cols-3 gap-2 mb-4">
                   {formData.images && formData.images.map((img) => (
                     <div key={img.id} className="relative aspect-square group rounded-lg overflow-hidden border border-slate-200">
-                      <img src={`http://${window.location.hostname}:5000${img.imageUrl}`} alt="Room" className="w-full h-full object-cover" />
+                      <img src={img.imageUrl.startsWith('http') ? img.imageUrl : `${window.location.protocol}//${window.location.host}${img.imageUrl}`} alt="Room" className="w-full h-full object-cover" />
                       <button 
                         type="button"
                         onClick={() => handleImageDelete(img.id)}

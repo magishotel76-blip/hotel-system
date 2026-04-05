@@ -136,7 +136,7 @@ const PublicReservations = () => {
               <div className="relative h-48 bg-slate-200 overflow-hidden">
                 {room.images && room.images.length > 0 ? (
                   <img 
-                    src={`http://${window.location.hostname}:5000${room.images[0]}`} 
+                    src={room.images[0].startsWith('http') ? room.images[0] : `${window.location.protocol}//${window.location.host}${room.images[0]}`} 
                     alt={`Habitación ${room.roomNumber}`} 
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer"
                     onClick={() => openLightbox(room.images, 0)}
@@ -343,7 +343,7 @@ const PublicReservations = () => {
             )}
             
             <img 
-              src={`http://${window.location.hostname}:5000${lightbox.images[lightbox.activeIndex]}`}
+              src={lightbox.images[lightbox.activeIndex].startsWith('http') ? lightbox.images[lightbox.activeIndex] : `${window.location.protocol}//${window.location.host}${lightbox.images[lightbox.activeIndex]}`}
               alt="Full view"
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-scale-up"
             />
@@ -356,7 +356,7 @@ const PublicReservations = () => {
                 onClick={() => setLightbox(prev => ({ ...prev, activeIndex: idx }))}
                 className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition ${lightbox.activeIndex === idx ? 'border-amber-500 scale-110' : 'border-transparent opacity-50 hover:opacity-100'}`}
               >
-                <img src={`http://${window.location.hostname}:5000${img}`} className="w-full h-full object-cover" alt="thumbnail" />
+                <img src={img.startsWith('http') ? img : `${window.location.protocol}//${window.location.host}${img}`} className="w-full h-full object-cover" alt="thumbnail" />
               </button>
             ))}
           </div>

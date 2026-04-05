@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { sendEmail, getHtmlTemplate } = require('../utils/mail');
 
 // @desc    Get all rooms for public listing
 // @route   GET /api/public/rooms
@@ -53,6 +54,31 @@ const createWebReservation = async (req, res) => {
       }
     });
     res.status(201).json({ message: 'Solicitud enviada exitosamente', data: webRes });
+
+    // Send email to guest
+    const html = getHtmlTemplate(
+      'Solicitud de Reserva Recibida',
+      `
+        <p>Hola <strong>${responsibleName}</strong>,</p>
+        <p>Hemos recibido tu solicitud de reserva en <strong>Joya Amazónica</strong>.</p>
+        <p><strong>Detalles:</strong></p>
+        <ul>
+          <li><strong>Check-In:</strong> ${new Date(checkIn).toLocaleDateString()}</li>
+          <li><strong>Check-Out:</strong> ${new Date(checkOut).toLocaleDateString()}</li>
+          <li><strong>Huéspedes:</strong> ${guestCount}</li>
+        </ul>
+        <p>Nuestro equipo revisará la disponibilidad y se pondrá en contacto contigo pronto para confirmar.</p>
+        <p>¡Gracias por elegirnos!</p>
+      `
+    );
+
+    if (email) {
+      sendEmail({
+        to: email,
+        subject: 'Confirmación de Solicitud de Reserva - Joya Amazónica',
+        html
+      }).catch(err => console.error('Error sending receipt email:', err));
+    }
   } catch (error) {
     res.status(500).json({ message: 'Error al procesar la reserva', error: error.message });
   }
@@ -166,6 +192,31 @@ const convertToOfficialReservation = async (req, res) => {
     });
 
     res.json({ message: 'Reserva convertida exitosamente', data: officialRes });
+
+    // Send confirmation email to guest
+    if (webRes.email) {
+      const html = getHtmlTemplate(
+        'Reserva Confirmada',
+        `
+          <p>Hola <strong>${webRes.responsibleName}</strong>,</p>
+          <p>¡Excelentes noticias! Tu reserva en <strong>Joya Amazónica</strong> ha sido confirmada.</p>
+          <p><strong>Detalles de tu estadía:</strong></p>
+          <ul>
+            <li><strong>Habitación:</strong> ${webRes.room.roomNumber}</li>
+            <li><strong>Check-In:</strong> ${webRes.checkIn.toLocaleDateString()}</li>
+            <li><strong>Check-Out:</strong> ${webRes.checkOut.toLocaleDateString()}</li>
+          </ul>
+          <p>Te esperamos para brindarte la mejor experiencia en la Amazonía.</p>
+          <p>Si tienes alguna duda, puedes contactarnos por WhatsApp al +593 96 041 4788.</p>
+        `
+      );
+
+      sendEmail({
+        to: webRes.email,
+        subject: 'Su Reserva ha sido CONFIRMADA - Joya Amazónica',
+        html
+      }).catch(err => console.error('Error sending confirmation email:', err));
+    }
   } catch (error) {
     res.status(500).json({ message: 'Error al convertir reserva', error: error.message });
   }

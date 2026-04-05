@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { 
-  Globe, CheckCircle, XCircle, ArrowRightCircle, Info, Phone, Mail, Building, Users, Calendar, Clock, Trash2 
+  Globe, CheckCircle, XCircle, ArrowRightCircle, Info, Phone, Mail, Building, Users, Calendar, Clock, Trash2, MessageCircle 
 } from 'lucide-react';
 
 const WebReservationsAdmin = () => {
@@ -97,8 +97,19 @@ const WebReservationsAdmin = () => {
                       {new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-800">{req.responsibleName}</div>
-                      <div className="text-xs text-slate-400">{req.phone}</div>
+                        <div className="font-bold text-slate-800">{req.responsibleName}</div>
+                        <div className="text-xs text-slate-400 flex items-center">
+                          {req.phone}
+                          <a 
+                            href={`https://wa.me/${req.phone.replace(/\D/g, '')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="ml-2 text-emerald-500 hover:text-emerald-600 transition"
+                            title="Contactar por WhatsApp"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
                     </td>
                     <td className="px-6 py-4">
                        <span className="font-medium text-indigo-600">Hab. {req.room.roomNumber}</span>
@@ -160,7 +171,18 @@ const WebReservationsAdmin = () => {
                        </div>
                        <div className="flex items-center">
                           <Phone className="w-4 h-4 mr-3 text-slate-400" />
-                          <p className="text-sm text-slate-600">{selectedRequest.phone}</p>
+                          <p className="text-sm text-slate-600 flex items-center">
+                            {selectedRequest.phone}
+                            <a 
+                              href={`https://wa.me/${selectedRequest.phone.replace(/\D/g, '')}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="ml-2 text-emerald-500 hover:text-emerald-600 transition"
+                              title="Contactar por WhatsApp"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </a>
+                          </p>
                        </div>
                        <div className="flex items-center">
                           <Mail className="w-4 h-4 mr-3 text-slate-400" />
