@@ -1,14 +1,10 @@
 {
-  "name": "hotel-system",
+  "name": "hotel-system-monorepo",
   "version": "1.0.0",
-  "description": "Hotel Management SaaS",
+  "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
-  },
-  "dependencies": {
-    "concurrently": "^8.2.2"
+    "build": "cd frontend && npm install && npm run build",
+    "install-backend": "cd backend && npm install",
+    "vercel-build": "npm run build && npm run install-backend"
   }
 }
