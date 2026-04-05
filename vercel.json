@@ -1,13 +1,14 @@
 {
   "version": 2,
+  "functions": {
+    "backend/server.js": {
+      "runtime": "vercel-node@latest"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/server.js"
-    },
-    {
-      "source": "/uploads/(.*)",
-      "destination": "/backend/uploads/$1"
+      "destination": "backend/server.js"
     }
   ]
 }
