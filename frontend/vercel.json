@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend-cloud/server.js"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "/backend-cloud/uploads/$1"
+    }
+  ]
+}
