@@ -27,6 +27,7 @@ const loginUser = async (req, res) => {
       res.status(401).json({ message: 'Email o contraseña inválidos' });
     }
   } catch (error) {
+    console.error('ERROR EN LOGIN (BACKEND):', error);
     res.status(500).json({ message: 'Error en el servidor', error: error.message });
   }
 };
