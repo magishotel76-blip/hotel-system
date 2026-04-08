@@ -3,8 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:frontend": "cd frontend && npm install && npm run build",
-    "build:backend": "cd backend && npm install && npx prisma generate",
-    "vercel-build": "npm run build:backend && npm run build:frontend"
+    "build": "npm install --prefix frontend && npm run build --prefix frontend && mkdir -p public && cp -v -r frontend/dist/. public/",
+    "postinstall": "prisma generate"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.10.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.3.1",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.4",
+    "pdf2json": "^4.0.2",
+    "pdfkit": "^0.17.2",
+    "prisma": "^5.10.0"
   }
 }

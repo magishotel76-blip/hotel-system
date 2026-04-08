@@ -34,7 +34,7 @@ const getDashboardMetrics = async (req, res) => {
       },
       include: { product: true }
     });
-    const monthlyFastSalesTotal = monthlyFastSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product.salePrice)), 0);
+    const monthlyFastSalesTotal = monthlyFastSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product?.salePrice || 0)), 0);
     const monthlyIncome = (monthlyInvoices._sum.totalAmount || 0) + monthlyFastSalesTotal;
 
     // Ingresos del día REALES
@@ -55,7 +55,7 @@ const getDashboardMetrics = async (req, res) => {
       },
       include: { product: true }
     });
-    const dailyFastSalesTotal = dailyFastSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product.salePrice)), 0);
+    const dailyFastSalesTotal = dailyFastSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product?.salePrice || 0)), 0);
     const dailyIncome = (dailyInvoices._sum.totalAmount || 0) + dailyFastSalesTotal;
 
     // 3. Productos con poco stock (menor a 10, por ejemplo)
@@ -91,7 +91,7 @@ const getDashboardMetrics = async (req, res) => {
       },
       include: { product: true }
     });
-    const unpaidSalesTotal = unpaidSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product.salePrice)), 0);
+    const unpaidSalesTotal = unpaidSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product?.salePrice || 0)), 0);
 
     // Tentativo Diario: Habitaciones ocupadas (hoy) + Cuentas por cobrar activas + Ingresos Rápidos Efectivo Hoy
     // NOTA: Se solicitó sumar explícitamente las ventas en efectivo del día actual.
@@ -110,7 +110,7 @@ const getDashboardMetrics = async (req, res) => {
       },
       include: { product: true }
     });
-    const foodRevenue = dailyFoodSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product.salePrice)), 0);
+    const foodRevenue = dailyFoodSales.reduce((acc, sale) => acc + (sale.quantity * (sale.price || sale.product?.salePrice || 0)), 0);
 
 
     // 6. Efectivo en Caja (CUMULATIVO: Total Entradas Cash - Total Salidas Cash)
@@ -168,9 +168,9 @@ const getDashboardMetrics = async (req, res) => {
       ...allPaidCashInvoices.map(inv => ({ ...inv, description: 'Factura Cobrada' })),
       ...allCashSales.map(sale => ({
         id: sale.id,
-        totalAmount: sale.quantity * (sale.price || sale.product.salePrice),
+        totalAmount: sale.quantity * (sale.price || sale.product?.salePrice || 0),
         updatedAt: sale.createdAt,
-        description: `Venta: ${sale.product.name}`
+        description: `Venta: ${sale.product?.name || 'Producto Desconocido'}`
       }))
     ].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
@@ -182,18 +182,6 @@ const getDashboardMetrics = async (req, res) => {
     const formattedExpenses = allExpenses.map(exp => ({...exp, date: exp.date}));
 
     // 7. Cuentas por Cobrar Acumuladas (Todo lo que está en 'office' y 'pending')
-    const allPendingOffice = await prisma.inventoryTransaction.aggregate({
-      where: {
-        type: 'salida',
-        exitType: 'venta',
-        paymentMethod: 'office',
-        status: 'pending'
-      },
-      _sum: { quantity: true },
-      // Note: We need the price, so better to findMany or aggregate with join if possible.
-      // Since Prisma aggregate doesn't join easily on _sum of product.price, we manually sum.
-    });
-
     const pendingTransactions = await prisma.inventoryTransaction.findMany({
       where: { 
         type: 'salida', 
@@ -203,11 +191,18 @@ const getDashboardMetrics = async (req, res) => {
       },
       include: { product: true, customer: true, room: true }
     });
-    const totalPendingOffice = pendingTransactions.reduce((acc, t) => acc + (t.quantity * (t.price || t.product.salePrice)), 0);
+    const totalPendingOffice = pendingTransactions.reduce((acc, t) => acc + (t.quantity * (t.price || t.product?.salePrice || 0)), 0);
 
     const occupiedRoomsList = await prisma.room.findMany({
       where: { status: 'ocupada' },
       include: { roomType: true }
+    });
+
+    // 8. Low stock products (properly filtered)
+    const lowStockProductsList = await prisma.product.findMany({
+      where: {
+        stock: { lte: 10 } // Simplified threshold for now, or fetch all and filter in JS if needed
+      }
     });
 
     res.json({
@@ -221,7 +216,7 @@ const getDashboardMetrics = async (req, res) => {
       activeReservationsCount,
       tentativeRevenue,
       cashInHotel,
-      foodRevenueToday: foodRevenue, // Reuse existing calculation for day's food sales
+      foodRevenueToday: foodRevenue,
       totalPendingOffice,
       breakdowns: {
         activeRooms,
@@ -238,9 +233,7 @@ const getDashboardMetrics = async (req, res) => {
           include: { customer: true, room: true }
         }),
         occupiedRoomsList,
-        lowStockProductsList: await prisma.product.findMany({
-          where: { stock: { lte: prisma.product.fields.minStock } } 
-        })
+        lowStockProductsList
       }
     });
   } catch (error) {

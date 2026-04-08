@@ -11,31 +11,25 @@ export default function Billing() {
   const [customers, setCustomers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedResId, setSelectedResId] = useState('');
   
   // Template Editing State
   const printRef = useRef();
   
   const [billData, setBillData] = useState({
-    invoiceNo: 'Rsroth-Cajoyam-002',
-    razonSocial: 'RS ROTH S.A.',
+    invoiceNo: `INV-${Date.now().toString().slice(-6)}`,
+    razonSocial: '',
     ruc: '',
     fecha: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }),
     direccion: '',
-    correo: 'carlos.salazar@rsroth.com',
+    correo: '',
     telefono: '',
-    firma1: 'Javier Samaniego/ Jefferson Haro',
+    firma1: 'Javier Samaniego / Jefferson Haro',
     cargo1: 'Supervisor',
     entidad1: 'HOTEL CAJOYAM',
     firma2: 'CLIENTE',
-    items: [
-      { cantidad: 99, detalle: 'Servicio de Alimentación Desayunos', valorUnitario: 5.39 },
-      { cantidad: 30, detalle: 'Servicio de Alimentación Almuerzos', valorUnitario: 5.39 },
-      { cantidad: 93, detalle: 'Servicio de Alimentación Merienda', valorUnitario: 5.39 },
-      { cantidad: 42, detalle: 'Servicio de hospedaje y lavandería habitacion individual', valorUnitario: 30.00 },
-      { cantidad: 62, detalle: 'Servicio de hospedaje y lavandería habitacion compartida', valorUnitario: 25.00 },
-      { cantidad: 91, detalle: 'Servicio de lavandería', valorUnitario: 2.50 },
-      { cantidad: 9, detalle: 'BOTELLÓN DE AGUA 20 LT', valorUnitario: 1.75 }
-    ]
+    reservationId: null,
+    items: []
   });
 
   const [dateRange, setDateRange] = useState('Del 01 al 31 de Enero del 2026');
@@ -61,6 +55,87 @@ export default function Billing() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleSelectReservation = async (resId) => {
+    setSelectedResId(resId);
+    if (!resId) return;
+
+    try {
+      setLoading(true);
+      const res = await api.get(`/billing/pending/${resId}`);
+      const { reservation, nights, pendingTransactions } = res.data;
+
+      // Group consumptions by name/price
+      const itemsMap = {};
+      pendingTransactions.forEach(t => {
+        const key = `${t.product.name}-${t.price}`;
+        if (itemsMap[key]) {
+          itemsMap[key].cantidad += t.quantity;
+        } else {
+          itemsMap[key] = {
+            cantidad: t.quantity,
+            detalle: t.product.name,
+            valorUnitario: t.price
+          };
+        }
+      });
+
+      const consumptionItems = Object.values(itemsMap);
+      
+      const newItems = [
+        { 
+          cantidad: nights, 
+          detalle: `Servicio de Hospedaje - Hab. ${reservation.room.roomNumber}`, 
+          valorUnitario: reservation.totalPrice / Math.max(1, (new Date(reservation.checkOutDate) - new Date(reservation.checkInDate)) / (1000 * 60 * 60 * 24)) || reservation.room.pricePerNight 
+        },
+        ...consumptionItems
+      ];
+
+      setBillData({
+        ...billData,
+        reservationId: reservation.id,
+        razonSocial: reservation.customer.name,
+        ruc: reservation.customer.document,
+        direccion: reservation.customer.address || '',
+        correo: reservation.customer.email || '',
+        telefono: reservation.customer.phone || '',
+        firma2: reservation.customer.name,
+        items: newItems
+      });
+
+      setDateRange(`Del ${new Date(reservation.checkInDate).toLocaleDateString()} al ${new Date().toLocaleDateString()}`);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error(error);
+      alert('Error cargando cargos pendientes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveInvoice = async () => {
+    try {
+      setLoading(true);
+      const payload = {
+        reservationId: billData.reservationId,
+        items: billData.items.map(i => ({
+          type: i.detalle.includes('Hospedaje') ? 'habitacion' : 'producto',
+          description: i.detalle,
+          quantity: i.cantidad,
+          unitPrice: i.valorUnitario
+        }))
+      };
+      await api.post('/billing', payload);
+      fetchData();
+      setIsModalOpen(false);
+      alert('Prefactura guardada exitosamente');
+    } catch (error) {
+      console.error(error);
+      alert('Error guardando factura');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePdfGenerate = () => {
     const element = printRef.current;
@@ -113,39 +188,64 @@ export default function Billing() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Prefacturación Flexible</h1>
-          <p className="text-slate-500 mt-1">Generador de plantillas corporativas y cobro individual</p>
+          <h1 className="text-2xl font-bold text-slate-800">Facturación & Liquidación</h1>
+          <p className="text-slate-500 mt-1">Generación de cuentas por cobrar y prefacturas corporativas</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
-        >
-          <FileText className="w-5 h-5" />
-          <span>Abrir Generador de Plantilla</span>
-        </button>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <select 
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[250px]"
+              value={selectedResId}
+              onChange={(e) => handleSelectReservation(e.target.value)}
+            >
+              <option value="">Seleccionar Reserva Activa...</option>
+              {reservations.map(res => (
+                <option key={res.id} value={res.id}>
+                  Hab. {res.room?.roomNumber} - {res.customer?.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Crear Manual</span>
+          </button>
+        </div>
       </div>
 
-      {/* Historial de Facturas Base (A mantener para registro interno) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden p-6 text-opacity-50">
-        <h2 className="text-lg font-bold text-slate-800 mb-4 opacity-50">Historial del Sistema</h2>
-        <div className="overflow-x-auto opacity-70">
+      {/* Historial de Facturas */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden p-6">
+        <h2 className="text-lg font-bold text-slate-800 mb-4">Cuentas por Cobrar / Historial</h2>
+        <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-slate-500 text-sm">
               <tr>
-                <th className="px-6 py-4 font-medium">Factura ID</th>
-                <th className="px-6 py-4 font-medium">Tipo</th>
+                <th className="px-6 py-4 font-medium">Factura #</th>
+                <th className="px-6 py-4 font-medium">Cliente</th>
                 <th className="px-6 py-4 font-medium">Monto</th>
                 <th className="px-6 py-4 font-medium">Estado</th>
                 <th className="px-6 py-4 font-medium text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">Cargando...</td></tr> : 
+              {loading && invoices.length === 0 ? (
+                <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">Cargando registros...</td></tr>
+              ) : invoices.length === 0 ? (
+                <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">No hay facturas registradas</td></tr>
+              ) : (
                 invoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td className="px-6 py-4 text-xs font-mono">{inv.id.substring(0,8)}</td>
-                  <td className="px-6 py-4 text-sm">{inv.invoiceType || 'NORMAL'}</td>
-                  <td className="px-6 py-4 font-medium">${inv.totalAmount.toFixed(2)}</td>
+                <tr key={inv.id} className="hover:bg-slate-50/50 transition">
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-mono font-bold text-indigo-600">{inv.id.substring(0,8).toUpperCase()}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-slate-700">{inv.reservation?.customer?.name || 'Cliente Externo'}</div>
+                    <div className="text-xs text-slate-400">Hab. {inv.reservation?.room?.roomNumber || 'N/A'}</div>
+                  </td>
+                  <td className="px-6 py-4 font-bold text-slate-700">${inv.totalAmount.toFixed(2)}</td>
                   <td className="px-6 py-4">
                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                       inv.status === 'pagada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
@@ -153,13 +253,21 @@ export default function Billing() {
                       {inv.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right space-x-2">
                      {inv.status === 'borrador' && (
-                        <button onClick={() => handlePayInvoice(inv.id)} className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg text-sm font-bold hover:bg-emerald-100">Cobrar</button>
+                        <button 
+                          onClick={() => handlePayInvoice(inv.id)} 
+                          className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 shadow-sm transition"
+                        >
+                          LIQUIDAR CUENTA
+                        </button>
                       )}
+                      <button className="p-2 text-slate-400 hover:text-indigo-600 transition" title="Ver Detalle">
+                        <Eye className="w-4 h-4" />
+                      </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
@@ -179,6 +287,9 @@ export default function Billing() {
                <div className="flex space-x-3">
                  <button onClick={addItem} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded flex items-center text-sm font-medium transition">
                    <Plus className="w-4 h-4 mr-1"/> Añadir Fila
+                 </button>
+                 <button onClick={saveInvoice} className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 rounded flex items-center text-sm font-medium transition shadow-lg border border-emerald-600/20">
+                    <CheckCircle className="w-4 h-4 mr-1"/> Guardar en Sistema
                  </button>
                  <button onClick={handlePdfGenerate} className="px-3 py-2 bg-indigo-500 hover:bg-indigo-400 rounded flex items-center text-sm font-medium transition shadow">
                    <Download className="w-4 h-4 mr-1"/> Generar PDF

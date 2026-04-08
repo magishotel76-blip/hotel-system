@@ -649,7 +649,10 @@ const registerFoodSale = async (req, res) => {
     // Código original para un solo item
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-    if (product.category?.toUpperCase() !== 'COMIDA' && product.stock < quantity) {
+    
+    // Safety check for category and stock
+    const isFood = (product.category || '').toUpperCase() === 'COMIDA';
+    if (!isFood && (product.stock || 0) < quantity) {
       return res.status(400).json({ message: 'Stock insuficiente' });
     }
 
@@ -662,23 +665,24 @@ const registerFoodSale = async (req, res) => {
         roomId: roomId || null,
         reservationId: reservationId || null,
         customerId: customerId || null,
-        quantity,
-        price: price ? parseFloat(price) : product.salePrice,
+        quantity: parseInt(quantity) || 1,
+        price: price ? parseFloat(price) : (product.salePrice || 0),
         paymentMethod: paymentMethod || 'cash',
         transferReference: transferReference || null,
         notes: notes || 'Venta de comida/consumo',
-        status: (paymentMethod === 'office' || (roomId && !paymentMethod)) ? 'pending' : 'settled' // Solo pendientes si son a cuenta
+        status: (paymentMethod === 'office' || (roomId && !paymentMethod)) ? 'pending' : 'settled'
       }
     });
 
-    // 2. Reduce stock
+    // 2. Reduce stock (if not food or if we track food stock)
     await prisma.product.update({
       where: { id: productId },
-      data: { stock: { decrement: quantity } }
+      data: { stock: { decrement: parseInt(quantity) || 1 } }
     });
 
     res.json({ message: 'Venta registrada con éxito', transaction });
   } catch (error) {
+    console.error('Error in registerFoodSale:', error);
     res.status(500).json({ message: 'Error al registrar la venta', error: error.message });
   }
 };

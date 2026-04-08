@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { differenceInDays, parseISO } = require('date-fns');
 
 // @desc    Get invoices
 // @route   GET /api/billing
@@ -88,13 +89,74 @@ const createInvoice = async (req, res) => {
 // @access  Private
 const payInvoice = async (req, res) => {
   try {
-    const invoice = await prisma.invoice.update({
-      where: { id: req.params.id },
+    const invoiceId = req.params.id;
+
+    // Fetch the invoice to get its reservationId
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { items: true }
+    });
+
+    if (!invoice) return res.status(404).json({ message: 'Factura no encontrada' });
+
+    // Update invoice status
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id: invoiceId },
       data: { status: 'pagada' },
     });
-    res.json(invoice);
+
+    // If linked to a reservation, mark all associated "pending" transactions as "settled"
+    if (invoice.reservationId) {
+      await prisma.inventoryTransaction.updateMany({
+        where: { reservationId: invoice.reservationId, status: 'pending' },
+        data: { status: 'settled' }
+      });
+    }
+
+    res.json(updatedInvoice);
   } catch (error) {
-    res.status(500).json({ message: 'Error paying invoice', error: error.message });
+    res.status(500).json({ message: 'Error marking invoice as paid', error: error.message });
+  }
+};
+
+// @desc    Get pending charges and stay details for a reservation
+// @route   GET /api/billing/pending/:reservationId
+// @access  Private
+const getPendingChargesByReservation = async (req, res) => {
+  const { reservationId } = req.params;
+
+  try {
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+      include: { customer: true, room: true },
+    });
+
+    if (!reservation) return res.status(404).json({ message: 'Reserva no encontrada' });
+
+    // Calculate nights
+    const start = new Date(reservation.checkInDate);
+    const end = new Date(); // Or reservation.checkOutDate if it's in the past
+    // Let's use checkOutDate as the default upper bound for billing
+    const billingEnd = new Date(reservation.checkOutDate) < new Date() ? new Date(reservation.checkOutDate) : new Date();
+    
+    let nights = Math.max(1, differenceInDays(billingEnd, start));
+    
+    // Fetch pending transactions
+    const pendingTransactions = await prisma.inventoryTransaction.findMany({
+      where: { 
+        reservationId: reservationId,
+        status: 'pending'
+      },
+      include: { product: true }
+    });
+
+    res.json({
+      reservation,
+      nights,
+      pendingTransactions
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching pending charges', error: error.message });
   }
 };
 
@@ -125,5 +187,6 @@ module.exports = {
   getInvoiceById,
   createInvoice,
   payInvoice,
-  deleteInvoice
+  deleteInvoice,
+  getPendingChargesByReservation
 };

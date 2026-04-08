@@ -1,26 +1,15 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "backend/server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "frontend/dist"
-      }
-    }
-  ],
+  "public": true,
+  "buildCommand": "npx prisma generate && npm install --prefix frontend && npm run build --prefix frontend && rm -rf public && mkdir public && cp -r frontend/dist/. public/",
+  "outputDirectory": "public",
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "backend/server.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/*.js": {
+      "includeFiles": "backend_logic/**"
     }
-  ]
+  }
 }
